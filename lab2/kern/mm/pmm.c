@@ -404,6 +404,19 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    // PTE_P是页表的入口标志位（1），用来查看是否存在，如果二级页表项（ptep）存在，二者与后应为1
+    if (*ptep & PTE_P) {
+        // 获取对应的页表
+        struct Page *page = pte2page(*ptep);
+        // 关联的引用-1并返回现在引用的值,如果引用为0，应该释放该物理页
+        if (page_ref_dec(page) == 0) {
+            free_page(page);
+        }
+        // 把表示虚地址与物理地址对应关系的二级页表项清除
+        *ptep = 0;
+        // 使对应的快表（TLB）无效
+        tlb_invalidate(pgdir, la);
+    }
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
