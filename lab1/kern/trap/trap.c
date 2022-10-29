@@ -152,16 +152,17 @@ trap_dispatch(struct trapframe *tf) {
 
     switch (tf->tf_trapno) {
     case IRQ_OFFSET + IRQ_TIMER:
-        /* LAB1 YOUR CODE : STEP 3 */
+        /* LAB1 2011839 liuyang : STEP 3 */
         /* handle the timer interrupt */
         /* (1) After a timer interrupt, you should record this event using a global variable (increase it), such as ticks in kern/driver/clock.c
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-	    // LAB1 2013743 Roslin
-        ticks++;		        // 每次时钟中断之后ticks就会加一
-    	if(ticks%TICK_NUM == 0) // 当加到TICK_NUM次数时,打印并重新开始
-    		print_ticks();
+        ticks++;
+        if( ticks == TICK_NUM ) {
+            ticks = 0;
+            print_ticks();
+        }
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
@@ -169,19 +170,17 @@ trap_dispatch(struct trapframe *tf) {
         break;
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
+        if( c == '3' ){
+            cprintf("switch to user 333\n");
+            lab1_switch_to_user();
+            print_trapframe(tf);
+            lab1_switch_to_kernel();
+        }else if( c == '0' ){
+            cprintf("switch to kernel 000\n");
+            lab1_switch_to_kernel();
+            print_trapframe(tf);
+        }
         cprintf("kbd [%03d] %c\n", c, c);
-        if(c == '0' && (tf->tf_cs & 3) != 0) {
-                cprintf("SWITCH TO KERNEL\n");
-                tf->tf_cs = KERNEL_CS;
-                tf->tf_ds = tf->tf_es = KERNEL_DS;
-                tf->tf_eflags &= ~FL_IOPL_MASK;
-        }
-        else if (c == '3' && (tf->tf_cs & 3) != 3) {
-                cprintf("SWITCH TO USER\n");
-                tf->tf_cs = USER_CS;
-                tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-                tf->tf_eflags |= FL_IOPL_MASK;
-        }
         break;
     // LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     // LAB1 2013743 Roslin
