@@ -9,7 +9,6 @@
 #include <intr.h>
 #include <pmm.h>
 #include <kmonitor.h>
-
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 static void lab1_switch_test(void);
@@ -84,25 +83,27 @@ lab1_print_cur_status(void) {
 
 static void
 lab1_switch_to_user(void) {
-    //LAB1 CHALLENGE 1 : TODO
+    // LAB1 CHALLENGE 1 : TODO
+    // LAB1 2013743 Roslin
     asm volatile(
-        "sub $0x8,%%esp \n"
-        "int %0 \n"
-        "movl %%ebp,%%esp \n"
-        :
-        :"i"(T_SWITCH_TOU)
-    );
+		    "sub $0x8,%%esp \n"
+		    "int %0 \n"
+		    "movl %%ebp, %%esp \n"
+		    :
+		    :"i"(T_SWITCH_TOU)
+		);
 }
 
 static void
 lab1_switch_to_kernel(void) {
-    //LAB1 CHALLENGE 1 :  TODO
+    // LAB1 CHALLENGE 1 :  TODO
+    // LAB1 2013743 Roslin
     asm volatile(
-        "int %0 \n"
-        "movl %%ebp.%%esp \n"
-        :
-        :"i"(T_SWITCH_TOK)
-    );
+		    "int %0 \n"
+		    "movl %%ebp, %%esp \n"
+		    :
+		    :"i"(T_SWITCH_TOK)
+		);
 }
 
 static void

@@ -8,6 +8,7 @@
 #include <default_pmm.h>
 #include <sync.h>
 #include <error.h>
+#include <buddy_pmm.h>
 
 /* *
  * Task State Segment:
@@ -138,6 +139,7 @@ gdt_init(void) {
 static void
 init_pmm_manager(void) {
     pmm_manager = &default_pmm_manager;
+    // pmm_manager = &buddy_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -359,6 +361,26 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
+    // 通过PDX(la)可以获得对应的PDE的索引，之后在pgdir中根据索引找到对应的PDE指针
+    pde_t *pdep = &pgdir[PDX(la)];
+    // PTE_P是页表的入口标志位（1），用来查看是否存在，如果二级页表项（ptep）存在，二者与后应为1
+    // 若不存在，则需要为其创建新的PTT
+    if(!(*pdep & PTE_P)) {
+        struct Page *temPage;
+        // 在创建时如果失败(创建标志为0或者分配物理内存页失败)需要立即返回
+        if(!create || (temPage = alloc_page()) == NULL) {
+            return NULL;
+        }
+        // 更新这个物理页的引用
+        set_page_ref(temPage,1);
+        // 获取这个temPage的物理地址
+        uintptr_t pa = page2pa(temPage);
+        // 把这个物理页全部初始化为0(需要用KADDR转换为内核虚拟地址)
+        memset(KADDR(pa),0,PGSIZE);
+        // 更新pde中的几个标识位
+        *pdep = pa | PTE_U | PTE_W | PTE_P;		
+    }
+    return &((pte_t *)KADDR(PDE_ADDR(*pdep)))[PTX(la)];
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir

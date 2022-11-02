@@ -46,12 +46,17 @@ idt_init(void) {
       *     You don't know the meaning of this instruction? just google it! and check the libs/x86.h to know more.
       *     Notice: the argument of lidt is idt_pd. try to find it!
       */
-     extern uintptr_t __vectors[];
-     for(int i = 0;i<256;i++)
-     {
-        SETGATE(idt[i],0,GD_KTEXT,__vectors[i],DPL_KERNEL);
-        lidt(&idt_pd)
-     }
+    // LAB1 2013743 Roslin
+    //声明__vertors[]
+    extern uintptr_t __vectors[];
+    // 对idt数组进行初始化
+    for(int i = 0; i < 256; i++) {
+        SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
+    }
+    // 设置从用户态切换到内核态
+    SETGATE(idt[T_SWITCH_TOK], 0, GD_KTEXT, __vectors[T_SWITCH_TOK], DPL_USER);
+    // 使用lidt指令加载中断描述符表
+    lidt(&idt_pd);
 }
 
 static const char *
@@ -153,9 +158,10 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-        ticks++;
-        if(ticks%TICK_NUM == 0)
-            print_ticks();
+	    // LAB1 2013743 Roslin
+        ticks++;		        // 每次时钟中断之后ticks就会加一
+    	if(ticks%TICK_NUM == 0) // 当加到TICK_NUM次数时,打印并重新开始
+    		print_ticks();
         break;
     case IRQ_OFFSET + IRQ_COM1:
         c = cons_getc();
@@ -164,40 +170,51 @@ trap_dispatch(struct trapframe *tf) {
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
-        if(c == '0'&&(tf->tf_cs & 3)!=0)
-        {
-            cprintf("SWITCH TO KERNEL\n");
-            tf->tf_cs = KERNEL_CS;
-            tf->tf_ds = tf->tf_es = KERNEL_DS;
-            tf->tf_eflags &= ~FL_IOPL_MASK;
+        if(c == '0' && (tf->tf_cs & 3) != 0) {
+                cprintf("SWITCH TO KERNEL\n");
+                tf->tf_cs = KERNEL_CS;
+                tf->tf_ds = tf->tf_es = KERNEL_DS;
+                tf->tf_eflags &= ~FL_IOPL_MASK;
         }
-        else if(c == '3' && (tf->tf_cs & 3)!=3)
-        {
-            cprintf("SWITCH TO USER\n");
-            tf->tf_cs = USER_DS;
-            tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
-            tf->tf_eflags |= FL_IOPL_MASK;
+        else if (c == '3' && (tf->tf_cs & 3) != 3) {
+                cprintf("SWITCH TO USER\n");
+                tf->tf_cs = USER_CS;
+                tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+                tf->tf_eflags |= FL_IOPL_MASK;
         }
         break;
-    //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
+    // LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
+    // LAB1 2013743 Roslin
     case T_SWITCH_TOU:
-        if(tf->tf_cs != USER_CS)
-        {
-            cprintf("SWITCH TO USER\n");
-            tf->tf_cs = USER_DS;
-            tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+        // 如果不是用户态
+        if(tf->tf_cs != USER_CS) {
+            cprintf("SWITCH TO USER!\n");
+            // 设置用户态对应的cs,ds,es,ss四个寄存器
+            tf->tf_cs = USER_CS;
+            tf->tf_ss = tf->tf_ds = tf->tf_es = tf->tf_gs = tf->tf_fs = USER_DS;
+            tf->tf_esp = (uint32_t)tf + sizeof(struct trapframe);
+            // 用户态使用I/O
             tf->tf_eflags |= FL_IOPL_MASK;
         }
         break;
-    case T_SWITCH_TOK:
-        if(tf->tf_cs != KERNEL_CS)
-        {
-            cprintf("SWITCH TO KERNEL\n");
+
+	case T_SWITCH_TOK:
+        // 如果不是内核态
+        if(tf->tf_cs != KERNEL_CS) {
+            cprintf("SWITCH TO KERNEL!\n");
+            // 设置内核态对应的cs,ds,es三个寄存器
             tf->tf_cs = KERNEL_CS;
             tf->tf_ds = tf->tf_es = KERNEL_DS;
+            // 内核态不使用I/O
             tf->tf_eflags &= ~FL_IOPL_MASK;
         }
         break;
+    /*
+    case T_SWITCH_TOU:
+    case T_SWITCH_TOK:
+        panic("T_SWITCH_** ??\n");
+        break;
+    */
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
         /* do nothing */
