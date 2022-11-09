@@ -50,7 +50,8 @@ idt_init(void) {
     //声明__vertors[]
     extern uintptr_t __vectors[];
     // 对idt数组进行初始化
-    for(int i = 0; i < 256; i++) {
+    int i;
+    for(i = 0; i < 256; i++) {
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
     // 设置从用户态切换到内核态

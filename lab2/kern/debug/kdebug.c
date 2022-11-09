@@ -306,12 +306,13 @@ print_stackframe(void) {
     uint32_t ebp=read_ebp();
     uint32_t eip=read_eip();
     // STACKFRAME_DEPTH = 20
-    for(int i = 0; ebp && eip && i < STACKFRAME_DEPTH; i++) {
+    int i,j;
+    for(i = 0; ebp && eip && i < STACKFRAME_DEPTH; i++) {
         cprintf("ebp: 0x%08x\n", ebp);
         cprintf("eip: 0x%08x\n", eip);
         uint32_t *args = (uint32_t *)ebp + 2; //传参
         cprintf("args: ");
-        for(int j = 0; j < 4; j++)
+        for(j = 0; j < 4; j++)
             cprintf("0x%08x ",args[j]); 
         cprintf("\n");
         print_debuginfo(eip - 1);

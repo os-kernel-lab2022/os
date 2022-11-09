@@ -97,19 +97,23 @@ struct e820map {
  * that convert Page to other data types, such as phyical address.
  * */
 struct Page {
-    int ref;                        // page frame's reference counter
+    int ref;                        // page frame's reference counter 记录引用页帧的计数器
     uint32_t flags;                 // array of flags that describe the status of the page frame
+                                    // 用于描述页帧状态的flags数组
     unsigned int property;          // the num of free block, used in first fit pm manager
-    list_entry_t page_link;         // free list link
+                                    // 空闲块的size，即空闲页的数量，会在FFMA中使用
+    list_entry_t page_link;         // free list link 空闲页的双向链表结点结构，包含prev和next
 };
 
 /* Flags describing the status of a page frame */
 #define PG_reserved                 0       // if this bit=1: the Page is reserved for kernel, cannot be used in alloc/free_pages; otherwise, this bit=0 
+                                            // 该值为0时表示页空闲；为1时表示内核占用该页，不可用于内存分配
 #define PG_property                 1       // if this bit=1: the Page is the head page of a free memory block(contains some continuous_addrress pages), and can be used in alloc_pages; if this bit=0: if the Page is the the head page of a free memory block, then this Page and the memory block is alloced. Or this Page isn't the head page.
-
+                                            // 该值为0，则当前页不是空闲块的首页；如果当前页是空闲块的首页，则该页不可用；该值为1，该页为空闲内存块的首页且可用
 #define SetPageReserved(page)       set_bit(PG_reserved, &((page)->flags))
 #define ClearPageReserved(page)     clear_bit(PG_reserved, &((page)->flags))
 #define PageReserved(page)          test_bit(PG_reserved, &((page)->flags))
+
 #define SetPageProperty(page)       set_bit(PG_property, &((page)->flags))
 #define ClearPageProperty(page)     clear_bit(PG_property, &((page)->flags))
 #define PageProperty(page)          test_bit(PG_property, &((page)->flags))
