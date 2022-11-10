@@ -22,11 +22,12 @@ static void buddy_init(void) {
 }
 //初始化zkw线段树的模板
 void init_zkw_segment_tree(void){
-    for (int i = 16384; i < 16384 << 1; ++i)
+    int i;
+    for (i = 16384; i < 16384 << 1; ++i)
     {
         buddy_pages[i] = 1;
     }
-    for (int i = 16384 - 1; i > 0; --i)
+    for (i = 16384 - 1; i > 0; --i)
     {
         buddy_pages[i] = buddy_pages[i << 1] << 1;
     }
@@ -59,8 +60,9 @@ size_t get_block_index(size_t n)
 
 //还是模板，一个维护的函数。注意,zkw线段树是要从下向上维护。
 void update(size_t index)
-{    
-    for (size_t i=index>>=1; (i>>1)>0;i>>=1)
+{
+    size_t i;
+    for (i=index>>=1; (i>>1)>0;i>>=1)
     {   
         buddy_pages[i] = max(buddy_pages[i<< 1], buddy_pages[i << 1 | 1]);
     }
@@ -114,7 +116,8 @@ static void buddy_init_memmap(struct Page *base, size_t n) {
 
     buddy_base = base;
     //常规操作，直接仿写
-    for (struct Page *p = buddy_base; p != base + n; ++p) {
+    struct Page *p=buddy_base;
+    for (; p != base + n; ++p) {
         ClearPageReserved(p);
         SetPageProperty(p);
         set_page_ref(p, 0);
@@ -139,7 +142,8 @@ static struct Page* buddy_alloc_pages(size_t n) {
     buddy_pages[index] = 0;
     // 那么父节点分配出去了，子节点就都没了
     struct Page* new_page = buddy_base + index * size - buddy_whole_pages;
-    for (struct Page* p = new_page; p != new_page + size; ++p)
+    struct Page* p = new_page;
+    for (; p != new_page + size; ++p)
     {
         set_page_ref(p, 0);
         ClearPageProperty(p);
@@ -158,13 +162,15 @@ static void buddy_free_pages(struct Page *base, size_t n) {
     size_t index= base - buddy_base+ buddy_whole_pages;
     
     //找到那个被我们复制成0的块，同时需要返回它的块大小。
-    for (int i=index; buddy_pages[i] > 0; i >>= 1)
+    int i;
+    for (i=index; buddy_pages[i] > 0; i >>= 1)
     {
       size<<=1;
       index>>=1;
     }
     //常规操作
-    for (struct Page *p = base; p != base + n; ++p) 
+    struct Page *p=base;
+    for (; p != base + n; ++p) 
     {
         assert(!PageReserved(p) && !PageProperty(p));
         SetPageProperty(p);
