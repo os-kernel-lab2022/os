@@ -8,7 +8,7 @@ static size_t buddy_whole_pages; //伙伴系统的所有页的数量
 static struct Page* buddy_base;//由于是一个连续的内存空间，因此我们需要把基地址记录下来
 static size_t buddy_pages[32768*4];//由于使用了zkw线段树，我们只有一个一维数组。理论上说这个空间只需要开到32768，因为页的数量是16384，不过开的很大页无所谓，可以防止越界。注意，线段树在端点处会退化成点树。
 
-free_area_t free_area;
+static free_area_t free_area;
 #define free_list (free_area.free_list)
 #define nr_free (free_area.nr_free)
 
