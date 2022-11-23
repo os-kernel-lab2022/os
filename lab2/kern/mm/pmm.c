@@ -41,6 +41,7 @@ size_t npage = 0;
 extern pde_t __boot_pgdir;
 pde_t *boot_pgdir = &__boot_pgdir;
 // physical address of boot-time page directory
+// 一级页表的起始物理地址；页对齐即低12bit为0
 uintptr_t boot_cr3;
 
 // physical memory management
@@ -146,7 +147,7 @@ init_pmm_manager(void) {
 
 //init_memmap - call pmm->init_memmap to build Page struct for free memory  
 static void
-init_memmap(struct Page *base, size_t n) {
+init_memmap(struct Page *base, size_t n) { // 参数需要某连续空闲块的起始页和页个数
     pmm_manager->init_memmap(base, n);
 }
 
@@ -192,7 +193,7 @@ nr_free_pages(void) {
 static void
 page_init(void) {
     struct e820map *memmap = (struct e820map *)(0x8000 + KERNBASE);
-    uint64_t maxpa = 0;
+    uint64_t maxpa = 0; // 内存布局信息中最大的物理内存地址
 
     cprintf("e820map:\n");
     int i;
@@ -206,24 +207,26 @@ page_init(void) {
             }
         }
     }
-    if (maxpa > KMEMSIZE) {
+    if (maxpa > KMEMSIZE) { // 物理内存的最大地址
         maxpa = KMEMSIZE;
     }
 
     extern char end[];
 
-    npage = maxpa / PGSIZE;
-    pages = (struct Page *)ROUNDUP((void *)end, PGSIZE);
-
+    npage = maxpa / PGSIZE; // 按页管理内存所需的物理页总数
+    pages = (struct Page *)ROUNDUP((void *)end, PGSIZE); // 按页大小进行边界取整
+                                                         // 得到Page结构所需的空间大小
     for (i = 0; i < npage; i ++) {
-        SetPageReserved(pages + i);
+        SetPageReserved(pages + i); // 将bit0位设置为PG_Reserved，即被kernel占用不可分配
     }
-
+    // 设定之前的物理内存空间为已占用（reserved)
+    // 设定空闲物理内存空间的起始地址
     uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);
-
+    // 设置空闲标记，划出空闲物理内存空间
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         if (memmap->map[i].type == E820_ARM) {
+            // 获得空闲空间的起始地址begin和结束地址end
             if (begin < freemem) {
                 begin = freemem;
             }
@@ -234,6 +237,8 @@ page_init(void) {
                 begin = ROUNDUP(begin, PGSIZE);
                 end = ROUNDDOWN(end, PGSIZE);
                 if (begin < end) {
+                    // 把空闲物理页对应的Page结构中ref和flags清零，并加入空闲页双向链表中，
+                    // 以方便后续空闲页管理的工作
                     init_memmap(pa2page(begin), (end - begin) / PGSIZE);
                 }
             }
@@ -327,7 +332,9 @@ pmm_init(void) {
 //  create: a logical value to decide if alloc a page for PT
 // return vaule: the kernel virtual address of this pte
 pte_t *
-get_pte(pde_t *pgdir, uintptr_t la, bool create) {
+get_pte(pde_t *pgdir, uintptr_t la, bool create) { // 获取pte
+/* 如果create参数为0，则get_pte返回NULL；如果create参数不为0，
+则get_pte需要申请一个新的物理页（通过alloc_page来实现） */
     /* LAB2 EXERCISE 2: YOUR CODE
      *
      * If you need to visit a physical address, please use KADDR()
@@ -377,9 +384,10 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
         uintptr_t pa = page2pa(temPage);
         // 把这个物理页全部初始化为0(需要用KADDR转换为内核虚拟地址)
         memset(KADDR(pa),0,PGSIZE);
-        // 更新pde中的几个标识位
+        // 更新pde中的几个标识位，用户级、可写、存在
         *pdep = pa | PTE_U | PTE_W | PTE_P;		
     }
+    //抹去low 12bit，只保留对应的PTT起始地址；用PTX获得PTT对应的PTE索引；用数组和对应索引得到PTE并返回
     return &((pte_t *)KADDR(PDE_ADDR(*pdep)))[PTX(la)];
 }
 
@@ -412,6 +420,7 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
      *   struct Page *page pte2page(*ptep): get the according page from the value of a ptep
      *   free_page : free a page
      *   page_ref_dec(page) : decrease page->ref. NOTICE: ff page->ref == 0 , then this page should be free.
+     *   重新设置TLB(translation lookaside buffer，储存最近从vir addr到physical addr的转译，用来减少reach内存的时间)
      *   tlb_invalidate(pde_t *pgdir, uintptr_t la) : Invalidate a TLB entry, but only if the page tables being
      *                        edited are the ones currently in use by the processor.
      * DEFINEs:
@@ -481,6 +490,7 @@ page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
 
 // invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
+// 当修改的页表目前正在被进程使用时，使之无效。
 void
 tlb_invalidate(pde_t *pgdir, uintptr_t la) {
     if (rcr3() == PADDR(pgdir)) {

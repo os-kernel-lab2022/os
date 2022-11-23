@@ -11,18 +11,15 @@
 // only needs to implement the methods in pmm_manager class, then XXX_pmm_manager can be used
 // by ucore to manage the total physical memory space.
 struct pmm_manager {
-    const char *name;                                 // XXX_pmm_manager's name 物理内存页管理的名字
+    const char *name;                                 // XXX_pmm_manager's name
     void (*init)(void);                               // initialize internal description&management data structure
                                                       // (free block list, number of free block) of XXX_pmm_manager 
-                                                      // 初始化该结构的成员变量、结构；即初始化该物理页内存管理器
     void (*init_memmap)(struct Page *base, size_t n); // setup description&management data structcure according to
                                                       // the initial free physical memory space 
     struct Page *(*alloc_pages)(size_t n);            // allocate >=n pages, depend on the allocation algorithm 
-                                                      // 分配n个物理内存也
     void (*free_pages)(struct Page *base, size_t n);  // free >=n pages with "base" addr of Page descriptor structures(memlayout.h)
-                                                      // 释放n个物理内存页
-    size_t (*nr_free_pages)(void);                    // return the number of free pages 返回当前全局空闲页的总数
-    void (*check)(void);                              // check the correctness of XXX_pmm_manager 检测分配/释放是否正确
+    size_t (*nr_free_pages)(void);                    // return the number of free pages 
+    void (*check)(void);                              // check the correctness of XXX_pmm_manager 
 };
 
 extern const struct pmm_manager *pmm_manager;
@@ -45,6 +42,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm);
 
 void load_esp0(uintptr_t esp0);
 void tlb_invalidate(pde_t *pgdir, uintptr_t la);
+struct Page *pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm);
 
 void print_pgdir(void);
 
@@ -105,7 +103,6 @@ kva2page(void *kva) {
     return pa2page(PADDR(kva));
 }
 
-// 从ptep值中获取相应的页面
 static inline struct Page *
 pte2page(pte_t pte) {
     if (!(pte & PTE_P)) {
@@ -129,14 +126,12 @@ set_page_ref(struct Page *page, int val) {
     page->ref = val;
 }
 
-// 增加该页的引用次数，返回剩下的引用次数。
 static inline int
 page_ref_inc(struct Page *page) {
     page->ref += 1;
     return page->ref;
 }
 
-// 减少该页的引用次数，返回剩下的引用次数。
 static inline int
 page_ref_dec(struct Page *page) {
     page->ref -= 1;
@@ -145,5 +140,7 @@ page_ref_dec(struct Page *page) {
 
 extern char bootstack[], bootstacktop[];
 
+extern void * kmalloc(size_t n);
+extern void kfree(void *ptr, size_t n);
 #endif /* !__KERN_MM_PMM_H__ */
 

@@ -55,7 +55,6 @@
 /* All physical memory mapped at this address */
 #define KERNBASE            0xC0000000
 #define KMEMSIZE            0x38000000                  // the maximum amount of physical memory
-                                                        // ucore实际物理内存的最大值，896MB，3670016个物理页
 #define KERNTOP             (KERNBASE + KMEMSIZE)
 
 /* *
@@ -64,7 +63,7 @@
  * table, which maps all the PTEs (Page Table Entry) containing the page mappings
  * for the entire virtual address space into that 4 Meg region starting at VPT.
  * */
-#define VPT                 0xFAC00000                  // 虚拟页表
+#define VPT                 0xFAC00000
 
 #define KSTACKPAGE          2                           // # of pages in kernel stack
 #define KSTACKSIZE          (KSTACKPAGE * PGSIZE)       // sizeof kernel stack
@@ -77,6 +76,7 @@
 
 typedef uintptr_t pte_t;
 typedef uintptr_t pde_t;
+typedef pte_t swap_entry_t; //the pte can also be a swap entry
 
 // some constants for bios interrupt 15h AX = 0xE820
 #define E820MAX             20      // number of entries in E820MAP
@@ -97,25 +97,22 @@ struct e820map {
  * physical page. In kern/mm/pmm.h, you can find lots of useful functions
  * that convert Page to other data types, such as phyical address.
  * */
-struct Page {                       // 对应一个物理页
-    int ref;                        // page frame's reference counter 该页被页表的引用次数
+struct Page {
+    int ref;                        // page frame's reference counter
     uint32_t flags;                 // array of flags that describe the status of the page frame
-                                    // 此物理页的状态标记
     unsigned int property;          // the num of free block, used in first fit pm manager
-                                    // 连续空闲块的size，即地址连续的空闲页的数量，会在FFMA中使用
-    list_entry_t page_link;         // free list link 空闲页的双向链表结点结构，包含prev和next
-                                    // 用到这个量的Page是这个连续空闲块的首页，即地址最小的一页
+    list_entry_t page_link;         // free list link
+    list_entry_t pra_page_link;     // used for pra (page replace algorithm)
+    uintptr_t pra_vaddr;            // used for pra (page replace algorithm)
 };
 
 /* Flags describing the status of a page frame */
 #define PG_reserved                 0       // if this bit=1: the Page is reserved for kernel, cannot be used in alloc/free_pages; otherwise, this bit=0 
-                                            // bit0是否保留：该值为0时表示页空闲；为1时表示内核占用该页，不可用于内存分配
 #define PG_property                 1       // if this bit=1: the Page is the head page of a free memory block(contains some continuous_addrress pages), and can be used in alloc_pages; if this bit=0: if the Page is the the head page of a free memory block, then this Page and the memory block is alloced. Or this Page isn't the head page.
-                                            // bit1是否空闲：该值为0，则当前页不是空闲块的首页；如果当前页是空闲块的首页，则该页不可用；该值为1，该页为空闲内存块的首页且可用
+
 #define SetPageReserved(page)       set_bit(PG_reserved, &((page)->flags))
 #define ClearPageReserved(page)     clear_bit(PG_reserved, &((page)->flags))
 #define PageReserved(page)          test_bit(PG_reserved, &((page)->flags))
-
 #define SetPageProperty(page)       set_bit(PG_property, &((page)->flags))
 #define ClearPageProperty(page)     clear_bit(PG_property, &((page)->flags))
 #define PageProperty(page)          test_bit(PG_property, &((page)->flags))

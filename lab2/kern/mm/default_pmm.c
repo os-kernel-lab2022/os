@@ -106,7 +106,7 @@ default_init(void) {
 
 static void
 default_init_memmap(struct Page *base, size_t n) { // 初始化空闲块
-    assert(n > 0); // 断言函数，如果n>0为真，运行；如果n>0为假，则它先打印一条错误消息然后终止程序
+    assert(n > 0); // 函数，如果n>0为真，运行；如果n>0为假，则它先打印一条错误消息然后终止程序
     struct Page *p = base; // 指向base页的p
     for (; p != base + n; p ++) {
         assert(PageReserved(p)); // PageReserved()是用来测试该页是否被内核占用的
@@ -181,7 +181,7 @@ default_free_pages(struct Page *base, size_t n) { // 释放size为n的内存块�
     }
     nr_free += n; // 释放完成之后，全局空闲页总数+n
     le = list_next(&free_list);
-    while (le != &free_list) { // 没有合并块的需要时
+    while (le != &free_list) {
         p = le2page(le, page_link);
         if (base + base->property <= p) {
             assert(base + base->property != p); // 两空闲块不相邻，合并终止
@@ -315,7 +315,7 @@ default_check(void) {
     assert(total == 0);
 }
 
-const struct pmm_manager default_pmm_manager = {
+const struct pmm_manager default_pmm_manager = { //以页为单位的物理内存分配管理
     .name = "default_pmm_manager",
     .init = default_init,
     .init_memmap = default_init_memmap,
